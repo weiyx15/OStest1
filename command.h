@@ -83,12 +83,12 @@ CommandResult Copy(int state, const char *Second, const char *Third, const char 
 		return result;
 	}
 	int from = DistinguishRoad(state, Second), to = DistinguishRoad(state, Third);
-	if (from == -1)
+	if (from == -1 || FileList[from].FileType == 0)
 	{
 		sprintf(result.output, "您输入的源文件路径不正确\n");
 		return result;
 	}
-	if (to == -1)
+	if (to == -1 || FileList[to].FileType == 0)
 	{
 		sprintf(result.output, "您输入的目标路径不正确\n");
 		return result;
@@ -98,54 +98,11 @@ CommandResult Copy(int state, const char *Second, const char *Third, const char 
 		sprintf(result.output, "不能将文件复制到其所在目录\n");
 		return result;
 	}
-	int newnode = ApplyFileNode();    //新建一个空文件结点值
-	if (newnode == -1)
-	{
-		sprintf(result.output, "磁盘已满，不能复制\n");
-		return result;
+	if (OperateCopy(from, to)) {
+		sprintf(result.output, "文件写入完成\n");
 	}
-	int i;
-	for (i = 0; i<12; i++)
-		FileList[newnode].FileName[i] = FileList[from].FileName[i];			//将源文件复制到新建的文件中
-	FileList[newnode].FileType = FileList[from].FileType;					//新文件类型与原来相同
-	FileList[newnode].ParentNodeNum = to;									//新文件的父母文件结点为目标文件
-	FileList[newnode].ChildNodeNum = -1;									//新文件的孩子文件结点不存在
-	FileList[newnode].BrotherNodeNum = FileList[to].ChildNodeNum;			//新文件的同级文件结点为目标文件的孩子结点文件
-	FileList[to].ChildNodeNum = newnode;									//新文件为目标文件的孩子结点文件
-	FileList[newnode].BlockNum = ApplyBlock();								//为新文件分配一个分区
-	WriteFileNode(to);														//目标文件重新写入磁盘
-	WriteFileNode(newnode);													 //将新建的文件写入磁盘
-	if (FileList[newnode].BlockNum == -1)
-	{
-		sprintf(result.output, "磁盘已满，文件内容无法复制\n");
-		return result;
-	}
-	int blocknum1 = FileList[from].BlockNum;
-	int blocknum2 = FileList[newnode].BlockNum;
-	while (blocknum1 != -1)		//遍历源文件在磁盘上的内容块
-	{
-		i = 0;
-		while (i<55 && BlockList[blocknum1].content[i] != '\0')    //复制文件内容
-		{
-			BlockList[blocknum2].content[i] = BlockList[blocknum1].content[i];
-			i++;
-		}
-		if (i<55)
-		{
-			sprintf(result.output, "文件复制完成\n");
-			WriteBlock(blocknum2);   //写入磁盘
-			return;
-		}
-		BlockList[blocknum2].IfUsing = true;					//将新分区标记为占用
-		BlockList[blocknum2].next = ApplyBlock();				//申请下一个分区
-		if (BlockList[blocknum2].next == -1)					//如果申请不到
-		{
-			sprintf(result.output, "磁盘空间不足，部分内容已复制\n");
-			return;
-		}
-		WriteBlock(blocknum2);									//申请到了，将新分区写入磁盘
-		blocknum1 = BlockList[blocknum1].next;					//当前分区位置后移
-		blocknum2 = BlockList[blocknum2].next;
+	else {
+		sprintf(result.output, "磁盘已满，无法复制\n");
 	}
 	return result;
 }
@@ -156,71 +113,62 @@ CommandResult XCopy(int state, const char *Second, const char *Third, const char
 	result.state = state;
 	if (!(strcmp(Second, "") != 0 && strcmp(Third, "") != 0) || strcmp(Other, "") != 0)
 	{
-		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
-		return;
+		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
+		return result;
 	}
 	int from = DistinguishRoad(state, Second), to = DistinguishRoad(state, Third);
-	if (!((secondfile == 1 || secondfile == 0 || secondfile == 2) && DistinguishRoad(Third) == 0))
+	if (from == -1 || FileList[from].FileType == 0)
 	{
-		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
-		return;
+		sprintf(result.output, "您输入的源文件路径不正确\n");
+		return result;
 	}
-	int from, to;
-	if (DistinguishRoad(Second) == 0)
+	if (to == -1 || FileList[to].FileType == 0)
 	{
-		from = InputRoad[InputRoadNode];
-		DistinguishRoad(Third);
-		to = InputRoad[InputRoadNode];
-		DirectoryTo(from, to);
-		WriteFileNodes(FileList[from].ChildNodeNum);
+		sprintf(result.output, "您输入的目标路径不正确\n");
+		return result;
 	}
-	if (DistinguishRoad(Second) == 1) 
+	if (FileList[from].FileType == 2)				// 源文件是文本文件
 	{
-		from = InputRoad[InputRoadNode];   //记录当前文件
-		DistinguishRoad(Third);
-		to = InputRoad[InputRoadNode];
-		DirectoryTo(from, to);
-	}
-		
-
-	if (DistinguishRoad(Second) == 2)
-	{
-		from = FileList[Road[RoadNode]].ChildNodeNum;   //记录子文件结点
-
-		while (from != -1)
-		{
-			if (FileList[from].FileType == 2 && strcmp(FileList[from].FileName, Second) == 0)
-				break;
-			from = FileList[from].BrotherNodeNum;
+		if (OperateCopy(from, to)) {
+			sprintf(result.output, "文件写入完成\n");
+			return result;
 		}
-		if (from == -1)
-		{
-			cout << "您输入的源文件路径不正确" << endl;
-			return;
+		else {
+			sprintf(result.output, "磁盘已满，无法复制\n");
+			return result;
 		}
-		DistinguishRoad(Third);
-		to = InputRoad[InputRoadNode];
-		DirectoryTo(from, to);
 	}
-	
-}
-//XCopy的目的文件部分
-void DirectoryTo(int from, int to)
-{
+	// 源文件是目录，递归复制子文件和子目录
 	if (FileList[from].ParentNodeNum == to)   //文件已经存在于目标路径中
 	{
-		cout << "不能将文件复制到其所在目录\n";
-		return;
+		sprintf(result.output, "不能将文件复制到其所在目录\n");
+		return result;
 	}
-	int newnode = ApplyFileNode();    //新建一个空文件结点值
-	if (newnode == -1)
+	if (OperateXCopy(from, to)) {
+		sprintf(result.output, "目录写入完成\n");
+		return result;
+	}
+	else {
+		sprintf(result.output, "磁盘已满，无法复制\n");
+		return result;
+	}
+}
+
+// 执行把位置为from的文件复制到to目录下的操作，保证from和to路径合法
+// Parameter:
+//	from: 源文件
+//	to: 目标路径
+// return:
+//	false, 表示磁盘不足，无法完成复制
+//	true, 表示复制成功
+bool OperateCopy(int from, int to)		
+{
+	int newnode = ApplyFileNode();		//新建一个空文件结点值
+	if (newnode == -1)					// 磁盘已满，无法申请新节点
 	{
-		cout << "磁盘已满，不能复制\n";
-		return;
+		return false;
 	}
-	int i;
-	for (i = 0; i < 12; i++)
-		FileList[newnode].FileName[i] = FileList[from].FileName[i];			//将源文件复制到新建的文件中
+	strcmp(FileList[newnode].FileName, FileList[from].FileName);			//复制文件名
 	FileList[newnode].FileType = FileList[from].FileType;					//新文件类型与原来相同
 	FileList[newnode].ParentNodeNum = to;									//新文件的父母文件结点为目标文件
 	FileList[newnode].ChildNodeNum = -1;									//新文件的孩子文件结点不存在
@@ -228,40 +176,73 @@ void DirectoryTo(int from, int to)
 	FileList[to].ChildNodeNum = newnode;									//新文件为目标文件的孩子结点文件
 	FileList[newnode].BlockNum = ApplyBlock();								//为新文件分配一个分区
 	WriteFileNode(to);														//目标文件重新写入磁盘
-	WriteFileNode(newnode);													 //将新建的文件写入磁盘
+	WriteFileNode(newnode);													//将新建的文件写入磁盘
 	if (FileList[newnode].BlockNum == -1)
 	{
-		cout << "磁盘已满，文件内容无法复制\n";
-		return;
+		return false;
 	}
 	int blocknum1 = FileList[from].BlockNum;
 	int blocknum2 = FileList[newnode].BlockNum;
-	while (blocknum1 != -1)		//磁盘没有满
+	while (blocknum1 != -1)		//遍历源文件在磁盘上的内容块
 	{
-		i = 0;
-		while (i < 55 && BlockList[blocknum1].content[i] != '\0')    //复制文件内容
-		{
-			BlockList[blocknum2].content[i] = BlockList[blocknum1].content[i];
-			i++;
-		}
-		if (i < 55)
-		{
-			cout << "文件复制完成\n";
-			WriteBlock(blocknum2);   //写入磁盘
-			return;
-		}
+		strcpy(BlockList[blocknum2].content, BlockList[blocknum1].content);	//复制分区内容
 		BlockList[blocknum2].IfUsing = true;					//将新分区标记为占用
+		if (BlockList[blocknum1].next == -1) {
+			BlockList[blocknum2].next = -1;
+			break;
+		}
 		BlockList[blocknum2].next = ApplyBlock();				//申请下一个分区
 		if (BlockList[blocknum2].next == -1)					//如果申请不到
 		{
-			cout << "磁盘空间不足，部分内容以复制\n";
-			return;
+			return false;
 		}
 		WriteBlock(blocknum2);									//申请到了，将新分区写入磁盘
 		blocknum1 = BlockList[blocknum1].next;					//当前分区位置后移
-		blocknum2 = BlockList[blocknum2].next;
+		blocknum2 = BlockList[blocknum2].next;					//目标分区位置后移
 	}
+	return true;
 }
+
+// 执行把位置为from的目录复制到to目录下的操作，保证from和to路径合法
+// Parameter:
+//	from: 源文件
+//	to: 目标路径
+// return:
+//	false, 表示磁盘不足，无法完成复制
+//	true, 表示复制成功
+bool OperateXCopy(int from, int to)
+{
+	int newnode = ApplyFileNode();		//新建一个空文件结点值
+	if (newnode == -1)					// 磁盘已满，无法申请新节点
+	{
+		return false;
+	}
+	strcmp(FileList[newnode].FileName, FileList[from].FileName);			//复制文件名
+	FileList[newnode].FileType = FileList[from].FileType;					//新文件类型与原来相同
+	FileList[newnode].ParentNodeNum = to;									//新文件的父母文件结点为目标文件
+	FileList[newnode].ChildNodeNum = FileList[from].ChildNodeNum;			//新文件的孩子文件结点不存在
+	FileList[newnode].BrotherNodeNum = FileList[to].ChildNodeNum;			//新文件的同级文件结点为目标文件的孩子结点文件
+	FileList[to].ChildNodeNum = newnode;									//新文件为目标文件的孩子结点文件
+	FileList[newnode].BlockNum = ApplyBlock();								//为新文件分配一个分区
+	WriteFileNode(to);														//目标文件重新写入磁盘
+	WriteFileNode(newnode);													//将新建的文件写入磁盘
+	int cur = FileList[from].ChildNodeNum;									// 源目录的子文件指针
+	while (cur != -1) {														// 遍历源目录的子文件
+		if (FileList[cur].FileType == 1) {
+			if (!OperateXCopy(cur, newnode)) {
+				return false;
+			}
+		}
+		else if (FileList[cur].FileType == 2) {
+			if (!OperateCopy(cur, newnode)) {
+				return false;
+			}
+		}
+		cur = FileList[cur].BrotherNodeNum;
+	}
+	return true;
+}
+
 //删除文件
 void Del()
 {
