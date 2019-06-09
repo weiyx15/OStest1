@@ -1,4 +1,3 @@
-#include "head.h"
 //´´½¨ĞéÄâ´ÅÅÌ
 void CreateDisk(const char *A)
 {

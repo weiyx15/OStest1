@@ -87,7 +87,7 @@ void PutOutRoad(int state)
 		state = FileList[state].ParentNodeNum;
 	}
 	cout << "A:\\";			// 打印根节点
-	for (int i = depth - 1; i >= 0; i++) {
+	for (int i = depth - 1; i >= 0; i--) {
 		cout << FileList[path[i]].FileName << '\\';
 	}
 	cout << '>';
@@ -172,6 +172,7 @@ CommandResult Commands(const CommandArray &commands, int state)
 	if (strcmp(commands.First, "") == 0) {
 		CommandResult result;
 		result.state = state;
+		result.output[0] = '\0';
 		return result;
 	}
 	else if (strcmp(commands.First, "attrib") == 0) return Attrib(state, commands.Second, commands.Third);
@@ -197,6 +198,7 @@ CommandResult Commands(const CommandArray &commands, int state)
 		CommandResult result;
 		result.state = state;
 		sprintf(result.output, "‘%s’不是内部命令，也不是可运行的程序或批处理文件\n", commands.First);
+		return result;
 	}
 }
 //判断路径
@@ -391,6 +393,7 @@ CommandResult Cd(int state, const char *Second, const char* Third)
 	else											// 是目录文件
 	{
 		result.state = destination;
+		result.output[0] = '\0';
 		return result;
 	}
 }
@@ -663,6 +666,7 @@ CommandResult Mk(int state, const char *Second, const char *Third)
 {
 	CommandResult result;
 	result.state = state;
+	result.output[0] = '\0';
 	if (strcmp(Second, "") == 0 || strcmp(Second, "") != 0 && strcmp(Third, "") != 0)
 	{
 		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
@@ -686,6 +690,7 @@ CommandResult Mk(int state, const char *Second, const char *Third)
 			sprintf(result.output, "文件名中不能有‘\\’字符\n");  //文件名中不能有'\'
 			return result;
 		}
+		i++;
 	}
 	int nodenum = ApplyFileNode();   //申请新文件结点
 	int contentnum = ApplyBlock();    //申请新分区
@@ -714,6 +719,7 @@ CommandResult Mkdir(int state, const char *Second, const char *Third)
 {
 	CommandResult result;
 	result.state = state;
+	result.output[0] = '\0';
 	if (strcmp(Second, "") == 0 || strcmp(Second, "") != 0 && strcmp(Third, "") != 0)
 	{
 		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
@@ -737,6 +743,7 @@ CommandResult Mkdir(int state, const char *Second, const char *Third)
 			sprintf(result.output, "文件名中不能有‘\\’字符\n");
 			return result;
 		}
+		i++;
 	}
 	int nodenum = ApplyFileNode();  //申请新的文件结点
 	if (nodenum == -1)
@@ -761,6 +768,7 @@ CommandResult Export(int state, const char *Second, const char *Third, const cha
 {
 	CommandResult result;
 	result.state = state;
+	result.output[0] = '\0';
 	if (!(strcmp(Second, "") != 0 && strcmp(Third, "") != 0) || strcmp(Other, "") != 0)
 	{
 		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
@@ -792,6 +800,7 @@ CommandResult Import(int state, const char *Second, const char *Third, const cha
 {
 	CommandResult result;
 	result.state = state;
+	result.output[0] = '\0';
 	if (!(strcmp(Second, "") != 0 && strcmp(Third, "") != 0) || strcmp(Other, "") != 0)
 	{
 		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
