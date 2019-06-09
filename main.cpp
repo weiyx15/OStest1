@@ -1,5 +1,5 @@
-#include"command.h"
-#include"operate.h"
+#include "command.h"
+#include "command.cpp"
 
 int  main()
 {
@@ -18,6 +18,7 @@ int  main()
 		CommandArray command = Interpretation(Command);     
 		CommandResult result = Commands(command, state);
 		state = result.state;
+		cout << result.output << endl;
 	}
 
 	return 0;

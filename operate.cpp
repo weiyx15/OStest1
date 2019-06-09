@@ -1,3 +1,4 @@
+#include "head.h"
 //创建虚拟磁盘
 void CreateDisk(const char *A)
 {
@@ -29,7 +30,7 @@ void Initial()
 	{
 		BlockList[i].IfUsing = false;
 		BlockList[i].next = -1;
-		for (j = 0; j<Block_Size-5; j++)
+		for (j = 0; j< USEABLE_BLOCK_SIZE; j++)
 			BlockList[i].content[j] = '\0';
 	}
 
@@ -327,7 +328,7 @@ void FreeBlock(int n)
 {
 	BlockList[n].IfUsing = false;   //将分区设为空
 	int i = 0;
-	for (i = 0; i < Block_Size - 5; i++)
+	for (i = 0; i < USEABLE_BLOCK_SIZE; i++)
 		BlockList[n].content[i] = '\0';
 	WriteBlock(n);
 }
