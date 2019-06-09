@@ -1,5 +1,4 @@
 #include "head.h"
-#include<cstring>
 //显示文本文件的属性
 CommandResult Attrib(int state, const char *Second, const char *Third)
 {
@@ -244,134 +243,296 @@ bool OperateXCopy(int from, int to)
 }
 
 //删除文件
-void Del()
+CommandResult Del(int state, const char *Second, const char *Third)
 {
+	CommandResult result;
+	result.state = state;
 	if (strcmp(Second, "") == 0 || strcmp(Second, "") != 0 && strcmp(Third, "") != 0)
+	{
+		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
+		return result;
+	}
+	int filenode = DistinguishRoad(state, Second);
+	if (filenode == -1 || FileList[filenode].FileType == 0)
+	{
+		sprintf(result.output, "您输入的文件路径不正确\n");
+		return result;
+	}
+	if (FileList[filenode].FileType == 2)   //目录
+	{
+		sprintf(result.output, "您输入的路径不是文本文件");
+		return result;
+	}
+	else									//文本文件
+	{
+		FreeBlocks(FileList[filenode].BlockNum);   //释放分区
+		// 释放文件节点，分两种情况讨论
+		int i = FileList[FileList[filenode].ParentNodeNum].ChildNodeNum;
+		if (i == filenode)							// 待删除的文件是同级链表的表头
+		{
+			FileList[FileList[i].ParentNodeNum].ChildNodeNum = FileList[i].BrotherNodeNum;
+			WriteFileNode(FileList[i].ParentNodeNum);	//将父母文件节点重新写入磁盘
+			FreeFileNode(i);                            //将文件本身删除
+		}
+		else
+		{
+			while (filenode != FileList[i].BrotherNodeNum)
+			{
+				i = FileList[i].BrotherNodeNum;
+				FileList[i].BrotherNodeNum = FileList[filenode].BrotherNodeNum;
+			}
+			FileList[i].BrotherNodeNum = FileList[filenode].BrotherNodeNum;
+			WriteFileNode(i);							// 将兄弟文件节点重新写入磁盘
+			FreeFileNode(filenode);
+		}
+		sprintf(result.output, "文件‘%s’已删除", FileList[filenode].FileName);
+		return result;
+	}
+}
+
+//列举目录下的目录和文件
+CommandResult Dir(int state, const char *Second, const char *Third)
+{
+	CommandResult result;
+	result.state = state;
+	if (strcmp(Third, "") != 0)
+	{
+		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
+		return result;
+	}
+	int root, son;
+	if (strcmp(Second, "") == 0) {
+		root = state;								// 当前路径
+	}
+	else {
+		root = DistinguishRoad(state, Second);		// 输入路径
+	}
+	if (FileList[root].FileType != 1) {
+		sprintf(result.output, "您输入的路径不是目录\n");
+		return result;
+	}
+	sprintf(result.output, "\n%s的目录\n", FileList[Road[RoadNode]].FileName);
+	son = FileList[root].ChildNodeNum;
+	while (son != -1)
+	{
+		if (FileList[son].FileType == 1) {              //显示所有目录文件
+			strcat(result.output, "\t<DIR>\t");
+			strcat(result.output, FileList[son].FileName);
+			strcat(result.output, "\n");
+		}
+		son = FileList[son].BrotherNodeNum;
+	}
+	son = FileList[root].ChildNodeNum;
+	while (son != -1)
+	{
+		if (FileList[son].FileType == 2) {              //显示所有文本文件
+			strcat(result.output, "\t     \t");
+			strcat(result.output, FileList[son].FileName);
+			strcat(result.output, "\n");
+		}
+		son = FileList[son].BrotherNodeNum;
+	}
+	return result;
+}
+
+//创建文件
+CommandResult Mk(int state, const char *Second, const char *Third)
+{
+	CommandResult result;
+	result.state = state;
+	if (strcmp(Second, "") == 0 || strcmp(Second, "") != 0 && strcmp(Third, "") != 0)
+	{
+		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
+		return result;
+	}
+	int i = FileList[state].ChildNodeNum;		//判断文件是否已经存在
+	while (i != -1)
+	{
+		if (strcmp(FileList[i].FileName, Second) == 0)    //判断是否存在
+		{
+			sprintf(result.output, "文件%s已经存在\n", Second);
+			return result;
+		}
+		i = FileList[i].BrotherNodeNum;
+	}
+	i = 0;										// 判断文件名中是否存在非法字符
+	while (Second[i] != '\0')
+	{
+		if (Second[i] == 92)
+		{
+			sprintf(result.output, "文件名中不能有‘\\’字符\n");  //文件名中不能有'\'
+			return result;
+		}
+	}
+	int nodenum = ApplyFileNode();   //申请新文件结点
+	int contentnum = ApplyBlock();    //申请新分区
+	if (nodenum == -1 || contentnum == -1)
+	{
+		sprintf(result.output, "磁盘已满，不能新建目录\n");
+		return result;
+	}
+	strcpy(FileList[nodenum].FileName, Second);
+	FileList[nodenum].FileType = 2;      //新文件类型为文本文件
+	FileList[nodenum].ParentNodeNum = state;   //当前文件为新文件的父母结点
+	FileList[nodenum].BrotherNodeNum = FileList[state].ChildNodeNum;  //当前文件的孩子结点为新文件的同级结点
+	FileList[state].ChildNodeNum = nodenum;  //当前文件的孩子结点为新文件
+	FileList[nodenum].ChildNodeNum = -1;    //新文件没有孩子结点
+	FileList[nodenum].BlockNum = contentnum;   //新文件写入新分区
+	BlockList[contentnum].IfUsing = true;   //新分区标记为占用
+	BlockList[contentnum].next = -1;       //新分区的下一个分区没有
+	BlockList[contentnum].content[0] = '\0';   //新文件内容为空
+	WriteFileNode(nodenum);        //将新文件写入磁盘
+	WriteFileNode(FileList[nodenum].ParentNodeNum);   //将新文件的父母结点写入磁盘
+	WriteBlock(contentnum);   //将新分区写入磁盘
+	return result;
+}
+//创建目录
+CommandResult Mkdir(int state, const char *Second, const char *Third)
+{
+	CommandResult result;
+	result.state = state;
+	if (strcmp(Second, "") == 0 || strcmp(Second, "") != 0 && strcmp(Third, "") != 0)
+	{
+		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
+		return result;
+	}
+	int i = FileList[state].ChildNodeNum;   //新的文件结点为当前结点的孩子结点
+	while (i != -1)
+	{
+		if (strcmp(FileList[i].FileName, Second) == 0)
+		{
+			sprintf(result.output, "目录%s已经存在\n", Second);
+			return result;
+		}
+		i = FileList[i].BrotherNodeNum;
+	}
+	i = 0;
+	while (Second[i] != '\0')
+	{
+		if (Second[i] == 92)
+		{
+			sprintf(result.output, "文件名中不能有‘\\’字符\n");
+			return result;
+		}
+	}
+	int nodenum = ApplyFileNode();  //申请新的文件结点
+	if (nodenum == -1)
+	{
+		sprintf(result.output, "磁盘已满，不能新建目录\n");
+		return result;
+	}
+	strcpy(FileList[nodenum].FileName, Second);
+	FileList[nodenum].FileName[i] = '\0';   //新文件名
+	FileList[nodenum].FileType = 1;     //新文件属性
+	FileList[nodenum].ParentNodeNum = state;  //父母结点
+	FileList[nodenum].BrotherNodeNum = FileList[state].ChildNodeNum;   //父母结点的孩子结点为新文件的同级结点
+	FileList[Road[RoadNode]].ChildNodeNum = nodenum;
+	FileList[nodenum].ChildNodeNum = -1;
+	WriteFileNode(nodenum);    //新文件写入磁盘
+	WriteFileNode(FileList[nodenum].ParentNodeNum);  //父母结点写入磁盘
+}
+
+//导出
+void Export()
+{
+	if (!(strcmp(Second, "") != 0 && strcmp(Third, "") != 0) || strcmp(Other, "") != 0)
 	{
 		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
 		return;
 	}
-	int i = DistinguishRoad(Second);
-	int filenode;
-	if (i == -1)
+	int secondfile = DistinguishRoad(Second);
+	if (!((secondfile == 1 || secondfile == 2)))
 	{
-		cout << "您输入的文件路径不正确" << endl;
+		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
 		return;
 	}
-	/*if (i == 0)   //目录文件
+	int from, to;
+	if (DistinguishRoad(Second) == 1)
+		from = InputRoad[InputRoadNode];   //记录当前文件
+	if (DistinguishRoad(Second) == 2)
 	{
-		filenode = InputRoad[InputRoadNode];
-		FreeFileNodes(FileList[filenode].ChildNodeNum);    //将孩子结点文件删除
-	}*/
-	if (i == 1)   //文本文件
-	{
-		filenode = InputRoad[InputRoadNode];
-		FreeBlocks(FileList[filenode].BlockNum);   //释放分区
-	}
-	if (i == 2)   //不是终结文件，即仍是路径
-	{
-		int n = FileList[Road[RoadNode]].ChildNodeNum;  //进入子文件
-		while (n != -1)
+		from = FileList[Road[RoadNode]].ChildNodeNum;   //记录子文件结点
+		while (from != -1)
 		{
-			if (strcmp(FileList[n].FileName, Second) == 0)
-			{
-				filenode = n;
-				if (FileList[n].FileType == 1)
-					FreeFileNodes(FileList[filenode].ChildNodeNum);  //删除孩子结点文件
-				else
-					FreeBlocks(FileList[filenode].BlockNum);   //如果是文本文件，释放分区
+			if (FileList[from].FileType == 2 && strcmp(FileList[from].FileName, Second) == 0)
 				break;
-			}
-			n = FileList[n].BrotherNodeNum;   //同级文件
+			from = FileList[from].BrotherNodeNum;
 		}
-		if (n == -1)
+		if (from == -1)
 		{
-			cout << "您输入的文件路径不正确" << endl;
+			cout << "您输入的源文件路径不正确" << endl;
 			return;
 		}
 	}
-	for (int j = 1; j <= RoadNode; j++)
-		if (Road[j] == filenode)
-		{
-			RoadNode = j - 1;
-			break;
-		}
-	i = FileList[FileList[filenode].ParentNodeNum].ChildNodeNum;
-	if (i == filenode)
-	{
-		FileList[FileList[i].ParentNodeNum].ChildNodeNum = FileList[i].BrotherNodeNum;
-		WriteFileNode(FileList[i].ParentNodeNum);  //将父母文件重新写入磁盘
-		FreeFileNode(i);                            //将文件本身删除
-		cout << "文件‘" << FileList[filenode].FileName << "’已删除";
-	}
-	if (i != filenode)
-	{
-		while (filenode != FileList[i].BrotherNodeNum)
-		{
-			i = FileList[i].BrotherNodeNum;
-			FileList[i].BrotherNodeNum = FileList[filenode].BrotherNodeNum;
-		}
-		FileList[i].BrotherNodeNum = FileList[filenode].BrotherNodeNum;
-		WriteFileNode(i);
-		FreeFileNode(filenode);
-		cout << "文件‘" << FileList[filenode].FileName << "’已删除";
-	}
+	ofstream out;
+	out.open(Third, std::ios::out | std::ios::app);
+	if (!out.is_open())
+		cout << "打开文件错误." << endl;
+
+	out << BlockList[FileList[from].BlockNum].content << endl;
+	out.close();
 }
-//显示文件信息
-void Dir()
+
+//导入
+void Import()
 {
-	int i;
-	if (strcmp(Second, "") == 0)
+	int nodenum = ApplyFileNode();   //申请新文件结点
+	int contentnum = ApplyBlock();    //申请新分区
+	if (nodenum == -1 || contentnum == -1)
 	{
-		cout << endl;
-		cout << FileList[Road[RoadNode]].FileName << "的目录\n" << endl;
-		i = FileList[Road[RoadNode]].ChildNodeNum;
-		while (i != -1)
-		{
-			if (FileList[i].FileType == 1)              //显示所有目录文件
-				cout << "\t<DIR>\t" << FileList[i].FileName << endl;
-			i = FileList[i].BrotherNodeNum;
-		}
-		i = FileList[Road[RoadNode]].ChildNodeNum;
-		while (i != -1)
-		{
-			if (FileList[i].FileType == 2)             //显示所有文本文件
-				cout << "\t  \t" << FileList[i].FileName << endl;
-			i = FileList[i].BrotherNodeNum;
-		}
+		cout << "磁盘已满，不能新建目录\n";
+		return;
 	}
-	else
+	int i = FileList[Road[RoadNode]].ChildNodeNum;   //新文件为当前文件的子文件
+	while (i != -1)
 	{
-		if (strcmp(Third, "") != 0)
+		if (strcmp(FileList[i].FileName, Third) == 0)    //判断是否存在
 		{
-			cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
+			cout << "文件" << Third << "已经存在\n";
 			return;
 		}
-		else
-		{
-			if (DistinguishRoad(Second) != 0)     //不是目录文件
-			{
-				cout << "您输入的目录路径不正确，具体可以使用help命令查看" << endl;
-				return;
-			}
-			cout << FileList[InputRoad[InputRoadNode]].FileName << "的目录\n" << endl;
-			i = FileList[InputRoad[InputRoadNode]].ChildNodeNum;
-			while (i != -1)
-			{
-				if (FileList[i].FileType == 1)
-					cout << "\t<DIR>\t" << FileList[i].FileName << endl;
-				i = FileList[i].BrotherNodeNum;
-			}
-			i = FileList[InputRoad[InputRoadNode]].ChildNodeNum;
-			while (i != -1)
-			{
-				if (FileList[i].FileType == 2)
-					cout << "\t  \t" << FileList[i].FileName << endl;
-				i = FileList[i].BrotherNodeNum;
-			}
-		}
+		i = FileList[i].BrotherNodeNum;
 	}
+	i = 0;
+	while (Third[i] != '\0')
+	{
+		if (Third[i] == 92)
+		{
+			cout << "文件名中不能有‘" << char(92) << "’字符" << endl;  //文件名中不能有'\'
+			return;
+		}
+		FileList[nodenum].FileName[i] = Third[i];  //将输入的文件名赋值给新建的文件结点
+		i++;
+	}
+	FileList[nodenum].FileType = 2;      //新文件类型为文本文件
+	FileList[nodenum].ParentNodeNum = Road[RoadNode];   //当前文件为新文件的父母结点
+	FileList[nodenum].BrotherNodeNum = FileList[Road[RoadNode]].ChildNodeNum;  //当前文件的孩子结点为新文件的同级结点
+	FileList[Road[RoadNode]].ChildNodeNum = nodenum;  //当前文件的孩子结点为新文件
+	FileList[nodenum].ChildNodeNum = -1;    //新文件没有孩子结点
+	FileList[nodenum].BlockNum = contentnum;   //新文件写入新分区
+	BlockList[contentnum].IfUsing = true;   //新分区标记为占用
+	BlockList[contentnum].next = -1;       //新分区的下一个分区没有	
+
+	ifstream infile;
+	infile.open(Second, ios::in);   //将文件流对象与文件连接起来 
+	if (!infile)
+	{
+		cerr << "ERROR!" << endl;
+	}
+	int sn = 0;
+	char c;
+	while (!infile.eof())
+	{
+		infile >> c;
+		BlockList[contentnum].content[sn++] = c;
+	}
+	infile.close();             //关闭文件输入流
+
+	WriteFileNode(nodenum);        //将新文件写入磁盘
+	WriteFileNode(FileList[nodenum].ParentNodeNum);   //将新文件的父母结点写入磁盘
+	WriteBlock(contentnum);   //将新分区写入磁盘
 }
+
 //退出系统
 void Exit()
 {
@@ -512,99 +673,7 @@ void Help()
 			cout << "\n您输入的命令‘" << Second << "’不存在\n";
 	}
 }
-//创建文件
-void Mk()
-{
-	if (strcmp(Second, "") == 0 || strcmp(Second, "") != 0 && strcmp(Third, "") != 0)
-	{
-		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
-		return;
-	}
-	int nodenum = ApplyFileNode();   //申请新文件结点
-	int contentnum = ApplyBlock();    //申请新分区
-	if (nodenum == -1 || contentnum == -1)
-	{
-		cout << "磁盘已满，不能新建目录\n";
-		return;
-	}
-	int i = FileList[Road[RoadNode]].ChildNodeNum;   //新文件为当前文件的子文件
-	while (i != -1)
-	{
-		if (strcmp(FileList[i].FileName, Second) == 0)    //判断是否存在
-		{
-			cout << "文件" << Second << "已经存在\n";
-			return;
-		}
-		i = FileList[i].BrotherNodeNum;
-	}
-	i = 0;
-	while (Second[i] != '\0')
-	{
-		if (Second[i] == 92)
-		{
-			cout << "文件名中不能有‘" << char(92) << "’字符" << endl;  //文件名中不能有'\'
-			return;
-		}
-		FileList[nodenum].FileName[i] = Second[i];  //将输入的文件名赋值给新建的文件结点
-		i++;
-	}
-	FileList[nodenum].FileType = 2;      //新文件类型为文本文件
-	FileList[nodenum].ParentNodeNum = Road[RoadNode];   //当前文件为新文件的父母结点
-	FileList[nodenum].BrotherNodeNum = FileList[Road[RoadNode]].ChildNodeNum;  //当前文件的孩子结点为新文件的同级结点
-	FileList[Road[RoadNode]].ChildNodeNum = nodenum;  //当前文件的孩子结点为新文件
-	FileList[nodenum].ChildNodeNum = -1;    //新文件没有孩子结点
-	FileList[nodenum].BlockNum = contentnum;   //新文件写入新分区
-	BlockList[contentnum].IfUsing = true;   //新分区标记为占用
-	BlockList[contentnum].next = -1;       //新分区的下一个分区没有
-	BlockList[contentnum].content[0] = '\0';   //新文件内容为空
-	WriteFileNode(nodenum);        //将新文件写入磁盘
-	WriteFileNode(FileList[nodenum].ParentNodeNum);   //将新文件的父母结点写入磁盘
-	WriteBlock(contentnum);   //将新分区写入磁盘
-}
-//创建目录
-void Mkdir()
-{
-	if (strcmp(Second, "") == 0 || strcmp(Second, "") != 0 && strcmp(Third, "") != 0)
-	{
-		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
-		return;
-	}
-	int nodenum = ApplyFileNode();  //申请新的文件结点
-	if (nodenum == -1)
-	{
-		cout << "磁盘已满，不能新建目录\n";
-		return;
-	}
-	int i = FileList[Road[RoadNode]].ChildNodeNum;   //新的文件结点为当前结点的孩子结点
-	while (i != -1)
-	{
-		if (strcmp(FileList[i].FileName, Second) == 0)
-		{
-			cout << "目录" << Second << "已经存在\n";
-			return;
-		}
-		i = FileList[i].BrotherNodeNum;
-	}
-	i = 0;
-	while (Second[i] != '\0')
-	{
-		if (Second[i] == 92)
-		{
-			cout << "文件名中不能有‘" << char(92) << "’字符" << endl;
-			return;
-		}
-		FileList[nodenum].FileName[i] = Second[i];
-		i++;
-	}
-	FileList[nodenum].FileName[i] = '\0';   //新文件名
-	FileList[nodenum].FileType = 1;     //新文件属性
-	FileList[nodenum].ParentNodeNum = Road[RoadNode];  //父母结点
-	FileList[nodenum].BrotherNodeNum = FileList[Road[RoadNode]].ChildNodeNum;   //父母结点的孩子结点为新文件的同级结点
-	FileList[Road[RoadNode]].ChildNodeNum = nodenum;
-	FileList[nodenum].ChildNodeNum = -1;
-	WriteFileNode(nodenum);    //新文件写入磁盘
-	WriteFileNode(FileList[nodenum].ParentNodeNum);  //父母结点写入磁盘
-}
+
 //修改文件内容
 void More()
 {
@@ -943,104 +1012,4 @@ void Ver()
 {
 	cout << endl;
 	cout << "Dingyuxing Platform [版本 1.0.0.1]" << endl;
-}
-//导出
-void Export()
-{
-	if (!(strcmp(Second, "") != 0 && strcmp(Third, "") != 0) || strcmp(Other, "") != 0)
-	{
-		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
-		return;
-	}
-	int secondfile = DistinguishRoad(Second);
-	if (!((secondfile == 1 || secondfile == 2)))
-	{
-		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
-		return;
-	}
-	int from, to;
-	if (DistinguishRoad(Second) == 1)
-		from = InputRoad[InputRoadNode];   //记录当前文件
-	if (DistinguishRoad(Second) == 2)
-	{
-		from = FileList[Road[RoadNode]].ChildNodeNum;   //记录子文件结点
-		while (from != -1)
-		{
-			if (FileList[from].FileType == 2 && strcmp(FileList[from].FileName, Second) == 0)
-				break;
-			from = FileList[from].BrotherNodeNum;
-		}
-		if (from == -1)
-		{
-			cout << "您输入的源文件路径不正确" << endl;
-			return;
-		}
-	}
-	ofstream out;
-	out.open(Third, std::ios::out | std::ios::app);
-	if (!out.is_open())
-		cout << "打开文件错误." << endl;
-	
-	out << BlockList[FileList[from].BlockNum].content << endl;
-	out.close();
-	
-}
-//导入
-void Import()
-{
-	int nodenum = ApplyFileNode();   //申请新文件结点
-	int contentnum = ApplyBlock();    //申请新分区
-	if (nodenum == -1 || contentnum == -1)
-	{
-		cout << "磁盘已满，不能新建目录\n";
-		return;
-	}
-	int i = FileList[Road[RoadNode]].ChildNodeNum;   //新文件为当前文件的子文件
-	while (i != -1)
-	{
-		if (strcmp(FileList[i].FileName, Third) == 0)    //判断是否存在
-		{
-			cout << "文件" << Third << "已经存在\n";
-			return;
-		}
-		i = FileList[i].BrotherNodeNum;
-	}
-	i = 0;
-	while (Third[i] != '\0')
-	{
-		if (Third[i] == 92)
-		{
-			cout << "文件名中不能有‘" << char(92) << "’字符" << endl;  //文件名中不能有'\'
-			return;
-		}
-		FileList[nodenum].FileName[i] = Third[i];  //将输入的文件名赋值给新建的文件结点
-		i++;
-	}
-	FileList[nodenum].FileType = 2;      //新文件类型为文本文件
-	FileList[nodenum].ParentNodeNum = Road[RoadNode];   //当前文件为新文件的父母结点
-	FileList[nodenum].BrotherNodeNum = FileList[Road[RoadNode]].ChildNodeNum;  //当前文件的孩子结点为新文件的同级结点
-	FileList[Road[RoadNode]].ChildNodeNum = nodenum;  //当前文件的孩子结点为新文件
-	FileList[nodenum].ChildNodeNum = -1;    //新文件没有孩子结点
-	FileList[nodenum].BlockNum = contentnum;   //新文件写入新分区
-	BlockList[contentnum].IfUsing = true;   //新分区标记为占用
-	BlockList[contentnum].next = -1;       //新分区的下一个分区没有	
-
-	ifstream infile;
-	infile.open(Second, ios::in);   //将文件流对象与文件连接起来 
-	if (!infile)
-	{
-		cerr << "ERROR!" << endl;
-	}
-	int sn = 0;
-	char c;
-	while (!infile.eof())
-	{
-		infile >> c;
-		BlockList[contentnum].content[sn++] = c;
-	}
-	infile.close();             //关闭文件输入流
-
-	WriteFileNode(nodenum);        //将新文件写入磁盘
-	WriteFileNode(FileList[nodenum].ParentNodeNum);   //将新文件的父母结点写入磁盘
-	WriteBlock(contentnum);   //将新分区写入磁盘
 }

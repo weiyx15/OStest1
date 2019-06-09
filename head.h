@@ -2,6 +2,7 @@
 #include<fstream>
 #include<iomanip>
 #include<string>
+#include<cstring>
 #include<ctime>
 
 using namespace std;
