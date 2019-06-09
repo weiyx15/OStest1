@@ -224,19 +224,17 @@ int DistinguishRoad(int state, const char* a)
 	}
 	while (a[i] != '\0')
 	{
-		path = 0;
+		j = 0;
 		while (a[i] != 92 && a[i] != '\0')
 		{
-			c[j] = a[i];
-			i++;
-			j++;
+			c[j++] = a[i++];
 		}
 		c[j] = '\0';
-		path = FileList[path].ChildNodeNum;  //j为A的孩子结点
-		while (c[0] != '\0'&& path != -1)
+		path = FileList[path].ChildNodeNum;
+		while (path != -1)
 		{
 			if (strcmp(c, "..") == 0) {
-				path = FileList[path].ParentNodeNum;
+				path = FileList[FileList[path].ParentNodeNum].ParentNodeNum;
 				break;
 			}
 			if (strcmp(FileList[path].FileName, c) == 0)   //如果A孩子结点的文件名与输入的路径名相同
@@ -249,8 +247,11 @@ int DistinguishRoad(int state, const char* a)
 		{
 			return -1;
 		}
-		if (c[0] == '\0')
-			i++;
+		if (a[i] == '\0')
+		{
+			break;
+		}
+		i++;
 	}
 	return path;
 }
@@ -584,7 +585,7 @@ CommandResult Del(int state, const char *Second, const char *Third)
 		sprintf(result.output, "您输入的文件路径不正确\n");
 		return result;
 	}
-	if (FileList[filenode].FileType == 2)   //目录
+	if (FileList[filenode].FileType == 1)   //目录
 	{
 		sprintf(result.output, "您输入的路径不是文本文件");
 		return result;
@@ -696,7 +697,7 @@ CommandResult Mk(int state, const char *Second, const char *Third)
 	int contentnum = ApplyBlock();    //申请新分区
 	if (nodenum == -1 || contentnum == -1)
 	{
-		sprintf(result.output, "磁盘已满，不能新建目录\n");
+		sprintf(result.output, "磁盘已满，不能新建文件\n");
 		return result;
 	}
 	strcpy(FileList[nodenum].FileName, Second);
@@ -740,7 +741,7 @@ CommandResult Mkdir(int state, const char *Second, const char *Third)
 	{
 		if (Second[i] == 92)
 		{
-			sprintf(result.output, "文件名中不能有‘\\’字符\n");
+			sprintf(result.output, "目录名中不能有‘\\’字符\n");
 			return result;
 		}
 		i++;
@@ -752,7 +753,6 @@ CommandResult Mkdir(int state, const char *Second, const char *Third)
 		return result;
 	}
 	strcpy(FileList[nodenum].FileName, Second);
-	FileList[nodenum].FileName[i] = '\0';   //新文件名
 	FileList[nodenum].FileType = 1;     //新文件属性
 	FileList[nodenum].ParentNodeNum = state;  //父母结点
 	FileList[nodenum].BrotherNodeNum = FileList[state].ChildNodeNum;   //父母结点的孩子结点为新文件的同级结点
@@ -824,6 +824,7 @@ CommandResult Import(int state, const char *Second, const char *Third, const cha
 			sprintf(result.output, "文件名中不能有‘\\’字符\n");		//文件名中不能有'\'
 			return result;
 		}
+		i++;
 	}
 	int nodenum = ApplyFileNode();   //申请新文件结点
 	int contentnum = ApplyBlock();    //申请新分区
