@@ -15,32 +15,14 @@ CommandResult Attrib(int state, const char *Second, const char *Third)
 		sprintf(result.output, "您输入的路径或文件名不正确\n");
 		return result;
 	}
-	if (nowvacation == 0)
+	if (FileList[nowvacation].FileType != 2)
 	{
 		sprintf(result.output, "您输入的路径终端不是文本文件\n");
 		return result;
 	}
-	int filenodenum, blocknum;
-	if (nowvacation == 1)   //是文本文件
-		filenodenum = InputRoad[InputRoadNode];
-	if (nowvacation == 2)   //是相对路径
-	{
-		filenodenum = FileList[state].ChildNodeNum;
-		while (filenodenum != -1)
-		{
-			if (strcmp(FileList[filenodenum].FileName, Second) == 0 && FileList[filenodenum].FileType == 2)
-				break;
-			filenodenum = FileList[filenodenum].BrotherNodeNum;
-		}
-		if (filenodenum == -1)
-		{
-			sprintf(result.output, "该目录下没有名为‘%s’的文本文件\n", Second);
-			return result;
-		}
-	}
-	blocknum = FileList[filenodenum].BlockNum;
+	int blocknum = FileList[nowvacation].BlockNum;
 	int len = strlen(BlockList[blocknum].content);
-	sprintf(result.output, "文件名称:%s\n字符串长度:%d\n文件类型: 文本文件\n", FileList[filenodenum].FileName, len);
+	sprintf(result.output, "文件名称:%s\n字符串长度:%d\n文件类型: 文本文件\n", FileList[nowvacation].FileName, len);
 	return result;
 }
 //打开文件
@@ -311,7 +293,7 @@ CommandResult Dir(int state, const char *Second, const char *Third)
 		sprintf(result.output, "您输入的路径不是目录\n");
 		return result;
 	}
-	sprintf(result.output, "\n%s的目录\n", FileList[Road[RoadNode]].FileName);
+	sprintf(result.output, "\n%s的目录\n", FileList[state].FileName);
 	son = FileList[root].ChildNodeNum;
 	while (son != -1)
 	{
@@ -426,10 +408,11 @@ CommandResult Mkdir(int state, const char *Second, const char *Third)
 	FileList[nodenum].FileType = 1;     //新文件属性
 	FileList[nodenum].ParentNodeNum = state;  //父母结点
 	FileList[nodenum].BrotherNodeNum = FileList[state].ChildNodeNum;   //父母结点的孩子结点为新文件的同级结点
-	FileList[Road[RoadNode]].ChildNodeNum = nodenum;
+	FileList[state].ChildNodeNum = nodenum;
 	FileList[nodenum].ChildNodeNum = -1;
 	WriteFileNode(nodenum);    //新文件写入磁盘
 	WriteFileNode(FileList[nodenum].ParentNodeNum);  //父母结点写入磁盘
+	return result;
 }
 
 //导出
@@ -521,7 +504,7 @@ CommandResult Import(int state, const char *Second, const char *Third, const cha
 	while (!infile.eof())
 	{
 		infile >> c;
-		if (sn < Block_Size) {
+		if (sn < Block_Size-5) {	// Block中有1字节分配给IfUsing, 4字节分配给next
 			BlockList[contentnum].content[sn++] = c;
 		} else {
 			int contentnum2 = ApplyBlock();
@@ -531,6 +514,7 @@ CommandResult Import(int state, const char *Second, const char *Third, const cha
 			}
 			sn = 0;
 			BlockList[contentnum].next = contentnum2;
+			WriteBlock(contentnum);   //将新分区写入磁盘
 			contentnum = contentnum2;
 			BlockList[contentnum].IfUsing = true;
 			BlockList[contentnum].next = -1;
@@ -541,7 +525,7 @@ CommandResult Import(int state, const char *Second, const char *Third, const cha
 
 	WriteFileNode(nodenum);        //将新文件写入磁盘
 	WriteFileNode(FileList[nodenum].ParentNodeNum);   //将新文件的父母结点写入磁盘
-	WriteBlock(contentnum);   //将新分区写入磁盘
+	return result;
 }
 
 ////退出系统

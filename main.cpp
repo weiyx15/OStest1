@@ -9,12 +9,15 @@ int  main()
 
 	ReadAll();
 
+	int state = 0;
+
 	while(true)
 	{
-		PutOutRoad();
+		PutOutRoad(state);
 		cin.getline(Command,200);
-		Interpretation();     
-		Commands();
+		CommandArray command = Interpretation(Command);     
+		CommandResult result = Commands(command, state);
+		state = result.state;
 	}
 
 	return 0;

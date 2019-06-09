@@ -43,10 +43,6 @@ struct CommandResult								// cmd返回值
 FileNode FileList[FileNode_Num];					//目录项
 BlockNode BlockList[Block_Num];						//磁盘分区数组
 
-int Road[20];										//文件记录
-int RoadNode;										//当前目录位置
-int InputRoad[20];									//输入记录
-int InputRoadNode;									//当前输入位置
 char Command[200];									//存储命令输入
 char First[30];										//命令名称
 char Second[100];									//命令的第一个参数
@@ -54,7 +50,7 @@ char Third[100];									//命令的第二个参数
 char Other[100];									//命令的其余部分
 
 void CreateDisk(char *A);							//创建固定大小的磁盘
-void Commands(const CommandArray &, int);			//根据命令选择相关的命令处理函数
+CommandResult Commands(const CommandArray &, int);	//根据命令选择相关的命令处理函数
 void PutOutRoad(int);								//输出路径
 void Initial();										//格式化
 void ReadAll();										//读取所有的信息，初始化相关变量

@@ -29,7 +29,7 @@ void Initial()
 	{
 		BlockList[i].IfUsing = false;
 		BlockList[i].next = -1;
-		for (j = 0; j<55; j++)
+		for (j = 0; j<Block_Size-5; j++)
 			BlockList[i].content[j] = '\0';
 	}
 
@@ -74,8 +74,6 @@ void ReadAll()
 			dist.read((char*)&BlockList[i], Block_Size);	    //从磁盘上读分区块信息
 		dist.close();
 	}
-	RoadNode = 0;   //当前目录位置
-	Road[0] = 0;     //文件记录
 }
 // 打印当前路径
 // Parameters:
@@ -167,31 +165,39 @@ CommandArray Interpretation(const char *Command)
 // Parameter:
 //	commands: 命令字符串数组
 //	state: 当前路径
-void Commands(const CommandArray &commands, int state)
+// Return:
+//	包含state和output的结构体
+CommandResult Commands(const CommandArray &commands, int state)
 {
-	if (strcmp(commands.First, "") == 0)return;
-	else if (strcmp(commands.First, "attrib") == 0)Attrib(state, commands.Second, commands.Third);
-	else if (strcmp(commands.First, "cd") == 0)Cd();
-	else if (strcmp(commands.First, "copy") == 0)Copy();
-	else if (strcmp(commands.First, "xcopy") == 0)XCopy();
-	else if (strcmp(commands.First, "del") == 0)Del();
-	else if (strcmp(commands.First, "dir") == 0)Dir();
-	else if (strcmp(commands.First, "exit") == 0)Exit();
+	if (strcmp(commands.First, "") == 0) {
+		CommandResult result;
+		result.state = state;
+		return result;
+	}
+	else if (strcmp(commands.First, "attrib") == 0) return Attrib(state, commands.Second, commands.Third);
+	else if (strcmp(commands.First, "cd") == 0) return Cd(state, commands.Second, commands.Third);
+	else if (strcmp(commands.First, "copy") == 0) return Copy(state, commands.Second, commands.Third, commands.Other);
+	else if (strcmp(commands.First, "xcopy") == 0) return XCopy(state, commands.Second, commands.Third, commands.Other);
+	else if (strcmp(commands.First, "del") == 0) return Del(state, commands.Second, commands.Third);
+	else if (strcmp(commands.First, "dir") == 0) return Dir(state, commands.Second, commands.Third);
+	else if (strcmp(commands.First, "mk") == 0) return Mk(state, commands.Second, commands.Third);
+	else if (strcmp(commands.First, "mkdir") == 0) return Mkdir(state, commands.Second, commands.Third);
+	else if (strcmp(commands.First, "import") == 0) return Import(state, commands.Second, commands.Third, commands.Other);
+	else if (strcmp(commands.First, "export") == 0) return Export(state, commands.Second, commands.Third, commands.Other);
+	/*else if (strcmp(commands.First, "exit") == 0)Exit();
 	else if (strcmp(commands.First, "format") == 0)Format();
 	else if (strcmp(commands.First, "find") == 0)Find();
 	else if (strcmp(commands.First, "help") == 0)Help();
-	else if (strcmp(commands.First, "mk") == 0)Mk();
-	else if (strcmp(commands.First, "mkdir") == 0)Mkdir();
 	else if (strcmp(commands.First, "more") == 0)More();
 	else if (strcmp(commands.First, "move") == 0)Move();
 	else if (strcmp(commands.First, "rmdir") == 0)Rmdir();
 	else if (strcmp(commands.First, "time") == 0) Time();
-	else if (strcmp(commands.First, "ver") == 0)Ver();
-	else if (strcmp(commands.First, "import") == 0)Import();
-	else if (strcmp(commands.First, "export") == 0)Export();
-	else
-		cout << "‘" << commands.First << "’不是内部命令，也不是可运行的程序或批处理文件" << endl;
-	cout << endl;
+	else if (strcmp(commands.First, "ver") == 0)Ver();*/
+	else {
+		CommandResult result;
+		result.state = state;
+		sprintf(result.output, "‘%s’不是内部命令，也不是可运行的程序或批处理文件\n", commands.First);
+	}
 }
 //判断路径
 // Parameter:
@@ -247,6 +253,8 @@ int DistinguishRoad(int state, const char* a)
 	return path;
 }
 //创建文件
+// Return:
+//	申请的文件节点分区号
 int ApplyFileNode()
 {
 	for (int i = 1; i<FileNode_Num; i++)
@@ -255,6 +263,8 @@ int ApplyFileNode()
 	return -1;
 }
 //创建分区
+// Return:
+//	申请的文件内容节点分区号
 int ApplyBlock()
 {
 	for (int i = 0; i<Block_Num; i++)
@@ -263,6 +273,8 @@ int ApplyBlock()
 	return -1;
 }
 //文件写入磁盘
+// Parameter:
+//	n: 文件节点索引号
 void WriteFileNode(int n)
 {
 	fstream dist;
@@ -276,17 +288,9 @@ void WriteFileNode(int n)
 	dist.write((char*)&FileList[n], FileNode_Size);
 	dist.close();
 }
-//目录写入磁盘
-void WriteFileNodes(int n)
-{
-	if (n == -1)    //路径不对
-		return;	
-	int to = FileList[InputRoad[InputRoadNode]].ChildNodeNum;
-	DirectoryTo(n, to);
-	WriteFileNodes(FileList[n].BrotherNodeNum);   //写入同级文件结点
-	WriteFileNodes(FileList[n].ChildNodeNum);   //写入孩子文件结点
-}
 //分区写入磁盘
+// Parameter:
+//	n: 分区索引号
 void WriteBlock(int n)
 {
 	fstream dist;
@@ -322,6 +326,9 @@ void FreeFileNodes(int n)
 void FreeBlock(int n)
 {
 	BlockList[n].IfUsing = false;   //将分区设为空
+	int i = 0;
+	for (i = 0; i < Block_Size - 5; i++)
+		BlockList[n].content[i] = '\0';
 	WriteBlock(n);
 }
 //释放分区
