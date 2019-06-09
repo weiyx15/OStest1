@@ -69,24 +69,23 @@ void FreeBlock(int);								//释放指定位置的分区
 void FreeBlocks(int);								//释放指定位置的分区，包括该盘块所在文本文件内容的所有分区
 CommandArray Interpretation(const char*);			//将命令分段
 int DistinguishRoad(int, const char*);				//解析路径
-void DirectoryTo(int, int);                         //找到写入指定文件目录
 
-CommandResult Attrib(int, const char*, const char*);         //显示一个文本文件的属性
-void Cd();											 //进入指定文件    
-void Copy();										 //复制文件 
-void XCopy();                                        //复制文件或目录下的所有文件   
-void Del();											 //删除文件
-void Dir();											 //显示文件目录 
-void Exit();										 //退出系统
-void Format();										 //格式化磁盘
-void Find();										 //查找字符串
-void Help();										 //帮助
-void Mk();											 //新建一个文本文件
-void Mkdir();										 //新建一个文件目录
-void More();										 //显示并修改文本文件内容 
-void Move();										 //移动文本文件位置
-void Rmdir();										 //删除一个文件目录
-void Time();										 //显示系统时间
-void Ver();											 //显示系统版本
-void Import();										 //从磁盘外导入
-void Export();										 //从磁盘外导出
+CommandResult Attrib(int, const char*, const char*);			//显示一个文本文件的属性
+CommandResult Cd(int, const char*, const char*);				//进入指定文件    
+CommandResult Copy(int ,const char*, const char*, const char*);	//复制文件 
+CommandResult XCopy(int, const char*, const char*, const char*);//复制文件或目录下的所有文件   
+CommandResult Del(int, const char*, const char*);				//删除文件
+CommandResult Dir(int, const char*, const char*);				//显示文件目录 
+CommandResult Mk(int, const char*, const char*);				//新建一个文本文件
+CommandResult Mkdir(int, const char*, const char*);				//新建一个文件目录
+CommandResult Import(int, const char*, const char*, const char*);//从磁盘外导入
+CommandResult Export(int, const char*, const char*, const char*);//从磁盘外导出
+//void Exit();										 //退出系统
+//void Format();									 //格式化磁盘
+//void Find();										 //查找字符串
+//void Help();										 //帮助
+//void More();										 //显示并修改文本文件内容 
+//void Move();										 //移动文本文件位置
+//void Rmdir();										 //删除一个文件目录
+//void Time();										 //显示系统时间
+//void Ver();										 //显示系统版本
