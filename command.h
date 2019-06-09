@@ -4,6 +4,7 @@
 #include<string>
 #include<cstring>
 #include<ctime>
+#include <windows.h>
 
 using namespace std;
 
@@ -35,7 +36,7 @@ struct CommandArray									// cmd命令字符串数组
 {
 	char First[30], Second[30], Third[30], Other[30];
 };
-struct CommandResult								// cmd返回值
+struct CommandResult								// 进程通信结构体
 {
 	int state;										// 执行cmd后当前目录
 	char output[256];								// 输出信息字符串
@@ -52,7 +53,7 @@ char Other[100];									//命令的其余部分
 
 void CreateDisk(char *A);							//创建固定大小的磁盘
 CommandResult Commands(const CommandArray &, int);	//根据命令选择相关的命令处理函数
-void PutOutRoad(int);								//输出路径
+char* PutOutRoad(int);								//输出路径
 void Initial();										//格式化
 void ReadAll();										//读取所有的信息，初始化相关变量
 void WriteFileNode(int);							//将指定的文件结点写入磁盘

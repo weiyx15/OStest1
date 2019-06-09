@@ -78,19 +78,24 @@ void ReadAll()
 // 打印当前路径
 // Parameters:
 //		state: FileList[state]指向当前路径
-void PutOutRoad(int state)
+// Return:
+//		路径字符串
+char* PutOutRoad(int state)
 {
+	char result[256] = "A:\\";		// 根节点必然存在
 	int path[30];			// 从根节点FileList[0]到FileList[state]的路径
 	int depth = 0;			// 当前路径深度
 	while (state != 0) {	// 尚未回溯至根节点
 		path[depth++] = state;
 		state = FileList[state].ParentNodeNum;
 	}
-	cout << "A:\\";			// 打印根节点
 	for (int i = depth - 1; i >= 0; i--) {
-		cout << FileList[path[i]].FileName << '\\';
+		strcat(result, FileList[path[i]].FileName);
+		if (i != 0)
+			strcat(result, "\\");
 	}
-	cout << '>';
+	strcat(result, ">");
+	return result;
 }
 //命令分段
 // Parameter:
@@ -169,10 +174,10 @@ CommandArray Interpretation(const char *Command)
 //	包含state和output的结构体
 CommandResult Commands(const CommandArray &commands, int state)
 {
-	if (strcmp(commands.First, "") == 0) {
+	if (strcmp(commands.First, "") == 0) {		// 默认命令是请求当前路径符号, 例如"A:\"
 		CommandResult result;
 		result.state = state;
-		result.output[0] = '\0';
+		sprintf(result.output, "%s", PutOutRoad(state));
 		return result;
 	}
 	else if (strcmp(commands.First, "attrib") == 0) return Attrib(state, commands.Second, commands.Third);
@@ -222,6 +227,10 @@ int DistinguishRoad(int state, const char* a)
 		path = state;		// 从当前目录开始
 		i = 0;
 	}
+	if (a[0] == '.' && a[1] == '.')
+	{
+		return FileList[path].ParentNodeNum;
+	}
 	while (a[i] != '\0')
 	{
 		j = 0;
@@ -233,10 +242,6 @@ int DistinguishRoad(int state, const char* a)
 		path = FileList[path].ChildNodeNum;
 		while (path != -1)
 		{
-			if (strcmp(c, "..") == 0) {
-				path = FileList[FileList[path].ParentNodeNum].ParentNodeNum;
-				break;
-			}
 			if (strcmp(FileList[path].FileName, c) == 0)   //如果A孩子结点的文件名与输入的路径名相同
 			{
 				break;
@@ -762,7 +767,6 @@ CommandResult Mkdir(int state, const char *Second, const char *Third)
 	WriteFileNode(FileList[nodenum].ParentNodeNum);  //父母结点写入磁盘
 	return result;
 }
-
 //导出
 CommandResult Export(int state, const char *Second, const char *Third, const char *Other)
 {
@@ -1022,50 +1026,35 @@ CommandResult Import(int state, const char *Second, const char *Third, const cha
 //}
 //
 ////修改文件内容
-//void More()
+//CommandResult More(int state, const char *Second, const char *Third)
 //{
+//	CommandResult result;
+//	result.state = state;
+//	result.output[0] = '\0';
 //	if (strcmp(Second, "") == 0 || strcmp(Second, "") != 0 && strcmp(Third, "") != 0)
 //	{
-//		cout << "您输入的命令格式不正确，具体可以使用help命令查看" << endl;
-//		return;
+//		sprintf(result.output, "您输入的命令格式不正确，具体可以使用help命令查看\n");
+//		return result;
 //	}
-//	int nowvacation = DistinguishRoad(Second);
-//	if (nowvacation == -1)
+//	int nowvacation = DistinguishRoad(state, Second);
+//	if (nowvacation == -1 || FileList[nowvacation].FileType == 0)
 //	{
-//		cout << "您输入的路径或文件名不正确" << endl;
-//		return;
+//		sprintf(result.output, "您输入的路径或文件名不正确\n");
+//		return result;
 //	}
-//	if (nowvacation == 0)
+//	if (FileList[nowvacation].FileType == 1)			// 是目录
 //	{
-//		cout << "您输入的路径终端不是文本文件" << endl;
-//		return;
+//		sprintf(result.output, "您输入的路径终端不是文本文件\n");
+//		return result;
 //	}
-//	int filenodenum, blocknum;
-//	if (nowvacation == 1)   //是文本文件
-//		filenodenum = InputRoad[InputRoadNode];
-//	if (nowvacation == 2)   //是路径
-//	{
-//		filenodenum = FileList[Road[RoadNode]].ChildNodeNum;
-//		while (filenodenum != -1)
-//		{
-//			if (strcmp(FileList[filenodenum].FileName, Second) == 0 && FileList[filenodenum].FileType == 2)
-//				break;
-//			filenodenum = FileList[filenodenum].BrotherNodeNum;
-//		}
-//		if (filenodenum == -1)
-//		{
-//			cout << "该目录下没有名为‘" << Second << "’的文本文件\n";
-//			return;
-//		}
-//	}
-//	blocknum = FileList[filenodenum].BlockNum;
+//	int blocknum = FileList[nowvacation].BlockNum;
 //	int i, j;
 //	char a[5];
 //	char newcontent[500];
 //	while (blocknum != -1)
 //	{
 //		i = 0;
-//		while (i < 55 && BlockList[blocknum].content[i] != '\0')
+//		while (i < USEABLE_BLOCK_SIZE && BlockList[blocknum].content[i] != '\0')
 //		{
 //			cout << BlockList[blocknum].content[i];   //输出文件内容
 //			i++;
